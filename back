@@ -1,0 +1,81 @@
+#!/bin/bash
+TARGET_DIR=$(pwd)
+KEY_REGEX="^-.*"
+NAMES_TO_FIND=""
+
+# Парсим ключи и их значения ./back -name <BACK_UP_NAME> -types <type1> <type2> ...
+while [[ -n "$1" ]]; do    
+    case $1 in
+        -dir)
+            shift
+            if [[ -n "$1" && ! "$1" =~ $KEY_REGEX ]]; then
+                NAME_OF_DIR=$HOME/tmp/$1
+                if [[ -e $NAME_OF_DIR ]]; then 
+                    echo "Such $NAME_OF_DIR directory already exists!" >&2
+                    exit 1
+                fi
+                mkdir $NAME_OF_DIR 
+                shift
+            else
+                echo "Provide name of directory after param -name" >&2
+                exit 1
+            fi
+            ;;
+        -types)
+            shift
+            while [[ -n "$1" && ! "$1" =~ $KEY_REGEX ]]; do
+                if [[ -z "$NAMES_TO_FIND" ]]; then 
+                    NAMES_TO_FIND="-name \*.$1"
+                else 
+                    NAMES_TO_FIND="$NAMES_TO_FIND -o -name \*.$1"
+                fi
+                shift
+            done
+            ;;
+        -tar)
+            shift
+            if [[ -n "$1" && ! "$1" =~ $KEY_REGEX ]]; then
+                NAME_OF_TAR="$1.tar"
+                shift
+            else
+                echo "Provide name of tar after param -tar" >&2
+            fi
+            ;;
+        *)
+            echo "No such $1 praram or option" >&2
+            shift
+            ;;
+    esac
+done
+
+# Осуществляем поиск нужный файлов
+FILES=$(eval "find $TARGET_DIR $NAMES_TO_FIND" | xargs)
+
+# Параметр для запуска sed, чтобы потом определить верный новый путь в временной директории до файла
+SED_COMAND_REPLACE="s|^$TARGET_DIR|$NAME_OF_DIR|"
+
+# Обрабатываем каждый файл, определяя его истинный путь в новой папке и создавая недостающие директории
+for FILE in $FILES; do
+    PATH_TO_COPY=$(echo $FILE | sed $SED_COMAND_REPLACE)
+    DIRECTORY=$(dirname $PATH_TO_COPY)
+    if [[ ! -e $DIRECTORY ]]; then
+        mkdir -p $DIRECTORY
+    fi
+    cp $FILE $PATH_TO_COPY
+done
+
+#tree $NAME_OF_DIR
+# Архивируем директорю
+tar -cvf $NAME_OF_TAR -C $(dirname $NAME_OF_DIR) "$(basename $NAME_OF_DIR)/" >/dev/null 
+
+# Шифруем ее
+openssl des3 -in $NAME_OF_TAR -out $NAME_OF_TAR.des3
+
+# Удаляем директорию после совершения всех операций
+if [ -e $NAME_OF_DIR ]; then
+    rm -rf $NAME_OF_DIR
+fi
+
+echo "done!"
+exit 0
+
