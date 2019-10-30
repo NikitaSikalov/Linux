@@ -1,9 +1,11 @@
 #!/bin/bash
-TARGET_DIR=$(pwd)
+
+TARGET_DIR=$HOME
 KEY_REGEX="^-.*"
 NAMES_TO_FIND=""
 
-# Парсим ключи и их значения ./back -name <BACK_UP_NAME> -types <type1> <type2> ...
+# Парсим ключи и их значения ./back -dir <NAME_OF_DIR> -types <type1> <type2> ... -dir <NAME_OF_DIR>
+# порядок параметров не имеет значения
 while [[ -n "$1" ]]; do    
     case $1 in
         -dir)
@@ -47,6 +49,16 @@ while [[ -n "$1" ]]; do
             ;;
     esac
 done
+
+if [[ -z "$NAME_OF_TAR" ]]; then
+    echo "Provvide name of tar" >&2
+    exit 1
+fi
+
+if [[ -z "$NAME_OF_DIR" ]]; then 
+    echo "Provide name of dir" >&2
+    exit 1
+fi
 
 # Осуществляем поиск нужный файлов
 FILES=$(eval "find $TARGET_DIR $NAMES_TO_FIND" | xargs)
