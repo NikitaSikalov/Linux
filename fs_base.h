@@ -48,7 +48,7 @@ struct inode {
     char fileName[MAX_FILE_NAME] ;
 
     size_t blocksDirectDataCount;     // это число адресных ячеек использующие прямую адресацию
-    unsigned short blocksIdxes[16];      // индексы блоков, который использует данный i-узел
+    unsigned short blocksIdxes[BLOCKS_PER_INODE];      // индексы блоков, который использует данный i-узел
 };
 
 struct inode* createInode(unsigned int id, char* fileName, bool isDir, unsigned short freeBlockIdxes[16]) {
@@ -102,6 +102,34 @@ void writeToFile(void* data, char* fileName, size_t size, size_t count, long int
     fseek(filePtr, offset, SEEK_SET);
     fwrite(data, size, count, filePtr);
     fclose(filePtr);
+}
+
+/**
+ * Инициализирует карту свободные блоков - глобально это будет просто массив bool,
+ * причем если true на индексе блока -> значит он свободен (считаем блок занятым, если он используется каким-то inode)
+ * false -> занят
+ * @return
+ */
+bool* initBlocksMap() {
+    bool* freeBlocksMap = (bool*)malloc(BLOCKS_COUNT);
+    for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
+        // все блоки изначально не заняты
+        freeBlocksMap[i] = true;
+    }
+    return freeBlocksMap;
+}
+
+/**
+ * Аналогичен initBlocksMap, но для inodes
+ * @return
+ */
+bool* initInodesMap() {
+    bool* freeInodesMap = (bool*)malloc(INODES_COUNT);
+    for (size_t i = 0; i < INODES_COUNT; ++i) {
+        // все блоки изначально не заняты
+        freeInodesMap[i] = true;
+    }
+    return freeInodesMap;
 }
 
 #endif //LINUX_FS_BASE_H
