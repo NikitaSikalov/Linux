@@ -8,6 +8,8 @@
 
 #define DIRECT_COUNT_BLOCKS 12  // кол-во адресных ячеек использующих прямую адресацию
 
+#define ROOT_INODE 0    // корневой i-node для пути /
+
 #define MAX_FILE_NAME 32
 
 #endif //LINUX_DEFINE_H

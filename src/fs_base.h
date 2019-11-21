@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "define.h"
+#include "src/define.h"
 
 /**
  * Структура супер-блока файловой системы
@@ -51,7 +51,7 @@ struct inode {
     unsigned short blocksIdxes[BLOCKS_PER_INODE];      // индексы блоков, который использует данный i-узел
 };
 
-struct inode* createInode(unsigned int id, char* fileName, bool isDir, unsigned short freeBlockIdxes[16]) {
+struct inode* createInode(short int id, char* fileName, bool isDir, short int freeBlockIdxes[BLOCKS_PER_INODE]) {
     struct inode* newInode = (struct inode*)malloc(sizeof(struct inode));
     newInode->isDir = isDir;
     const size_t fileNameLength = strlen(fileName);
@@ -62,7 +62,7 @@ struct inode* createInode(unsigned int id, char* fileName, bool isDir, unsigned 
     time(&newInode->CTime);
     time(&newInode->MTime);
     newInode->blocksDirectDataCount = DIRECT_COUNT_BLOCKS;
-    memcpy(newInode->blocksIdxes, freeBlockIdxes, 16 * sizeof(unsigned short));
+    memcpy(newInode->blocksIdxes, freeBlockIdxes, 16 * sizeof(short));
     return newInode;
 }
 
@@ -74,7 +74,7 @@ struct inode* createInode(unsigned int id, char* fileName, bool isDir, unsigned 
  * @param count - кол-во считываемых элементов
  * @param offset - смещение с начала файла для считывания данных в байтах
  */
-void readFromFile(void* data, char* fileName, size_t size, size_t count, long int offset) {
+void readFromFile(void* data, const char* fileName, size_t size, size_t count, const long int offset) {
     FILE* filePtr = fopen(fileName, "r+");
     if (filePtr == NULL) {
         printf("Не удалось открыть файл %s", fileName);
@@ -93,7 +93,7 @@ void readFromFile(void* data, char* fileName, size_t size, size_t count, long in
  * @param count - кол-во считываемых элементов
  * @param offset - смещение с начала файла для записи данных в байтах
  */
-void writeToFile(void* data, char* fileName, size_t size, size_t count, long int offset) {
+void writeToFile(void* data, const char* fileName, size_t size, size_t count, const long int offset) {
     FILE* filePtr = fopen(fileName, "r+");
     if (filePtr == NULL) {
         printf("Не удалось открыть файл %s", fileName);
@@ -131,5 +131,15 @@ bool* initInodesMap() {
     }
     return freeInodesMap;
 }
+
+const long int OFFSET_SUPER_BLOCK = 0;
+const long int OFFSET_BLOCKS_MAP = OFFSET_SUPER_BLOCK + (long)sizeof(struct super_block);
+const long int OFFSET_INODES_MAP = OFFSET_BLOCKS_MAP + (long)sizeof(bool) * BLOCKS_COUNT;
+const long int OFFSET_INODES_TABLE = OFFSET_INODES_MAP + (long)sizeof(bool) * INODES_COUNT;
+const long int OFFSET_DATA_BLOCKS = OFFSET_INODES_TABLE + (long)sizeof(struct inode) * INODES_COUNT;
+const char FS_STORE[] = "tmpFile";
+const size_t SUPER_BLOCK_SIZE = sizeof(struct super_block);
+const size_t INODE_SIZE = sizeof(struct inode);
+
 
 #endif //LINUX_FS_BASE_H
