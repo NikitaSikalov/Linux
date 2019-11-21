@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 int main() {
     char FS_STORE[100];
     strcpy(FS_STORE, getenv("FILE_STORE"));

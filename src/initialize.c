@@ -2,13 +2,13 @@
 // Created by sikalov on 11/21/19.
 //
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include "fs_base.h"
 
 int main() {
-    char FS_STORE[100];
-    strcpy(FS_STORE, getenv("FILE_STORE"));
-    printf("%s\n", FS_STORE);
+    // инициализурем супер-блок и записываем его в файл
+    initSuperBlock();
+
+    // инициализируем карту блоков
+    initBlocksMap();
     return 0;
 }

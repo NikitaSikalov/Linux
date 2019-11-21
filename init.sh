@@ -1,7 +1,8 @@
 #!/bin/bash
 
 BIN_DIR="bin"
-FILE_STORE="$BIN_DIR/fs_store"
+FILE_STORE_NAME="fs_store"
+FILE_STORE="$BIN_DIR/$FILE_STORE_NAME"
 INIT_PROG="$BIN_DIR/initProg.o"
 
 make init
@@ -14,7 +15,7 @@ if [ ! -e $BIN_DIR ]; then
 fi
 touch $FILE_STORE
 if [ -e $INIT_PROG ]; then
-  export FILE_STORE=$FILE_STORE
+  export FILE_STORE=$FILE_STORE_NAME
   './'$INIT_PROG
 else
   echo "Error, no executable file $INIT_PROG, check Makefile"

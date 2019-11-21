@@ -1,145 +1,107 @@
 #ifndef LINUX_FS_BASE_H
 #define LINUX_FS_BASE_H
 
-#include <stdbool.h>
 #include <time.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
 
-#include "src/define.h"
+#include "fs_store_functions.h"
+#include "base_structures.h"
 
-/**
- * Структура супер-блока файловой системы
- */
-struct super_block {
-    size_t blocksCount;
-    size_t freeBlocksCount;
-    size_t inodesCount;
-    size_t inodesFreeCount;
+void updateSuperBlock(struct super_block* superBlock);
+void initSuperBlock();
+struct super_block* getSuperBlock();
 
-    unsigned int rootInode;
-    size_t blockSize;
-};
+void initBlocksMap();
+void updateBlocksMap(bool* blocksMap);
+bool* getBlocksMap();
+size_t* getFreeBlocks(size_t count);
 
-/**
- * Инициализация супер блока
- * @return
- */
-struct super_block* initSuperBlock() {
+// ----------------------------- SUPER BLOCK LOGIC ----------------------------------------------
+
+void initSuperBlock() {
     struct super_block* superBlock = (struct super_block*)malloc(sizeof(struct super_block));
     superBlock->blocksCount = BLOCKS_COUNT;
     superBlock->freeBlocksCount = BLOCKS_COUNT;
     superBlock->inodesCount = INODES_COUNT;
     superBlock->inodesFreeCount = INODES_COUNT;
+    superBlock->sizeBlock = BLOCK_SIZE;
+
+    superBlock->superBlockOffset = 0;
+    superBlock->blocksMapOffset = superBlock->superBlockOffset + (long) sizeof(struct super_block);
+    superBlock->inodesMapOffset = superBlock->blocksMapOffset + (long) sizeof(superBlock->blocksCount);
+    superBlock->inodesTableOffset = superBlock->inodesMapOffset + (long) sizeof(superBlock->inodesCount);
+    superBlock->dataBlocksOffset = superBlock->inodesTableOffset + (long) sizeof(struct inode);
+    superBlock->currentInode = ROOT_INODE;
+    superBlock->blocksPerInode = BLOCKS_PER_INODE;
+    superBlock->maxFileName = MAX_FILE_NAME;
+    superBlock->blocksCountWithDirectAddress = DIRECT_COUNT_BLOCKS;
+    updateSuperBlock(superBlock);
+    free(superBlock);
+}
+
+void updateSuperBlock(struct super_block* superBlock) {
+    writeToFile((void *)superBlock, sizeof(struct super_block), 1, superBlock->superBlockOffset);
+}
+
+struct super_block* getSuperBlock() {
+    struct super_block* superBlock = (struct super_block*)malloc(sizeof(struct super_block));
+    readFromFile(superBlock, sizeof(struct super_block), 1, 0);
     return superBlock;
 }
 
-/**
- * Для упрощения в нашей файловой системе будет только прямая и косвенная адресация
- */
-struct inode {
-    unsigned int id;
-    bool isDir;  // считаем что в нашей ФС будет всего два типа файлов -> dir - true и file - false
-    size_t fileSize;    // реальный размер файла
-    time_t MTime;   // время последний модифкации файла
-    time_t CTime;   // время создания файла
+// --------------------------------- DATA BLOCKS LOGIC ----------------------------
 
-    char fileName[MAX_FILE_NAME] ;
+void initBLocksMap() {
+    struct super_block* superBlock = getSuperBlock();
+    size_t blocksCount = superBlock->blocksCount;
+    bool* blocksMap = (bool *)malloc(blocksCount);
+    for (size_t i = 0; i < blocksCount; ++i) {
+        blocksMap[i] = false; // значит что блоки свободен
+    }
+    updateBlocksMap(blocksMap);
+    free(blocksMap);
+}
 
-    size_t blocksDirectDataCount;     // это число адресных ячеек использующие прямую адресацию
-    unsigned short blocksIdxes[BLOCKS_PER_INODE];      // индексы блоков, который использует данный i-узел
-};
+void updateBlocksMap(bool* blocksMap) {
+    struct super_block* superBlock = getSuperBlock();
+    writeToFile(blocksMap, superBlock->blocksCount, superBlock->blocksCount, superBlock->blocksMapOffset);
+    free(superBlock);
+}
 
-struct inode* createInode(short int id, char* fileName, bool isDir, short int freeBlockIdxes[BLOCKS_PER_INODE]) {
-    struct inode* newInode = (struct inode*)malloc(sizeof(struct inode));
-    newInode->isDir = isDir;
-    const size_t fileNameLength = strlen(fileName);
-    if (fileNameLength > MAX_FILE_NAME) {
+bool* getBlocksMap() {
+    struct super_block* superBlock = getSuperBlock();
+    size_t blocksCount = superBlock->blocksCount;
+    bool* blocksMap = (bool *)malloc(blocksCount);
+    readFromFile(blocksMap, blocksCount, blocksCount, superBlock->blocksMapOffset);
+    free(superBlock);
+    return blocksMap;
+}
+
+size_t* getFreeBlocks(size_t count) {
+    struct super_block* superBlock = getSuperBlock();
+    if (superBlock->freeBlocksCount < count) {
+        printf("Невозможно выделить %d кол-во блоков, так как сейчас свободно %d",
+                (int)count,
+                (int)superBlock->freeBlocksCount);
         return NULL;
     }
-    strcpy(newInode->fileName, fileName);
-    time(&newInode->CTime);
-    time(&newInode->MTime);
-    newInode->blocksDirectDataCount = DIRECT_COUNT_BLOCKS;
-    memcpy(newInode->blocksIdxes, freeBlockIdxes, 16 * sizeof(short));
-    return newInode;
-}
-
-/**
- * Считывает с файла с определенного места указанное кол-во байт
- * @param data - указатель, куда будут записываться данные
- * @param fileName - имя файла, откуда будем считывать инфу
- * @param size - размер считываемого элемента
- * @param count - кол-во считываемых элементов
- * @param offset - смещение с начала файла для считывания данных в байтах
- */
-void readFromFile(void* data, const char* fileName, size_t size, size_t count, const long int offset) {
-    FILE* filePtr = fopen(fileName, "r+");
-    if (filePtr == NULL) {
-        printf("Не удалось открыть файл %s", fileName);
-        exit(1);
+    bool* blocksMap = getBlocksMap();
+    size_t* freeBlocks = (size_t*)malloc(count * sizeof(size_t));
+    size_t pointer = 0;
+    for (size_t i = 0; i < superBlock->blocksCount; ++i) {
+        if (!blocksMap[i]) {
+            freeBlocks[pointer++] = i;
+            superBlock->freeBlocksCount--;
+        }
+        if (pointer == count) {
+            break;
+        }
     }
-    fseek(filePtr, offset, SEEK_SET);
-    fread(data, size, count, filePtr);
-    fclose(filePtr);
+    updateSuperBlock(superBlock);
+    free(superBlock);
+    free(blocksMap);
+    return freeBlocks;
 }
 
-/**
- * Записыввает информацию в файл
- * @param data - указатель, куда будут записываться данные
- * @param fileName - имя файла, куда будем записывать данные
- * @param size - размер записываемого элемента
- * @param count - кол-во считываемых элементов
- * @param offset - смещение с начала файла для записи данных в байтах
- */
-void writeToFile(void* data, const char* fileName, size_t size, size_t count, const long int offset) {
-    FILE* filePtr = fopen(fileName, "r+");
-    if (filePtr == NULL) {
-        printf("Не удалось открыть файл %s", fileName);
-        exit(1);
-    }
-    fseek(filePtr, offset, SEEK_SET);
-    fwrite(data, size, count, filePtr);
-    fclose(filePtr);
-}
-
-/**
- * Инициализирует карту свободные блоков - глобально это будет просто массив bool,
- * причем если true на индексе блока -> значит он свободен (считаем блок занятым, если он используется каким-то inode)
- * false -> занят
- * @return
- */
-bool* initBlocksMap() {
-    bool* freeBlocksMap = (bool*)malloc(BLOCKS_COUNT);
-    for (size_t i = 0; i < BLOCKS_COUNT; ++i) {
-        // все блоки изначально не заняты
-        freeBlocksMap[i] = true;
-    }
-    return freeBlocksMap;
-}
-
-/**
- * Аналогичен initBlocksMap, но для inodes
- * @return
- */
-bool* initInodesMap() {
-    bool* freeInodesMap = (bool*)malloc(INODES_COUNT);
-    for (size_t i = 0; i < INODES_COUNT; ++i) {
-        // все блоки изначально не заняты
-        freeInodesMap[i] = true;
-    }
-    return freeInodesMap;
-}
-
-const long int OFFSET_SUPER_BLOCK = 0;
-const long int OFFSET_BLOCKS_MAP = OFFSET_SUPER_BLOCK + (long)sizeof(struct super_block);
-const long int OFFSET_INODES_MAP = OFFSET_BLOCKS_MAP + (long)sizeof(bool) * BLOCKS_COUNT;
-const long int OFFSET_INODES_TABLE = OFFSET_INODES_MAP + (long)sizeof(bool) * INODES_COUNT;
-const long int OFFSET_DATA_BLOCKS = OFFSET_INODES_TABLE + (long)sizeof(struct inode) * INODES_COUNT;
-const char FS_STORE[] = "tmpFile";
-const size_t SUPER_BLOCK_SIZE = sizeof(struct super_block);
-const size_t INODE_SIZE = sizeof(struct inode);
-
+// ------------------------------------- INODES LOGIC ---------------------------------
 
 #endif //LINUX_FS_BASE_H
