@@ -30,6 +30,7 @@ struct super_block {
     long int dataBlocksOffset;
 
     size_t currentInode;    // указывает на i-node текущей папки
+    size_t rootInode;       // указывает на корневой каталог
     size_t blocksPerInode;  // кол-во блоков на один i-узел
     size_t maxFileName;     // максимальное имя файла
     size_t blocksCountWithDirectAddress;       // кол-во блоков в i-node с прямой адресацией
@@ -53,7 +54,7 @@ struct inode {
 
     char fileName[MAX_FILE_NAME];
 
-    struct block_info blocksIdxes[BLOCKS_PER_INODE];      // индексы блоков, который использует данный i-узел
+    struct block_info blocksInfo[BLOCKS_PER_INODE];      // индексы блоков, который использует данный i-узел
 };
 
 
