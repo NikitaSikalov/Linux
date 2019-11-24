@@ -9,6 +9,7 @@
 void updateSuperBlock(struct super_block* superBlock);
 void initSuperBlock();
 struct super_block* getSuperBlock();
+void changeCurrentInode(size_t id);
 
 void initBlocksMap();
 void updateBlocksMap(bool* blocksMap);
@@ -23,11 +24,13 @@ void updateInodesMap(bool*);
 bool* getInodesMap();
 struct inode* createInodeByIdx(size_t id, size_t parentId, bool isDir, char* fileName);
 size_t createInode(size_t parentId, bool isDir, char* fileName);
+size_t createDirInode(size_t parentId, char* dirName);
 void updateInode(struct inode* node);
 struct inode* getInodeById(size_t id);
 void writeToInode(size_t id, size_t size, void* data);
 void* readFromInode(size_t id);
 struct inode* getCurrentDirInode();
+size_t getCountOfFiles(struct inode* node);
 
 // ----------------------------- SUPER BLOCK LOGIC ----------------------------------------------
 
@@ -41,9 +44,9 @@ void initSuperBlock() {
 
     superBlock->superBlockOffset = 0;
     superBlock->blocksMapOffset = superBlock->superBlockOffset + (long) sizeof(struct super_block);
-    superBlock->inodesMapOffset = superBlock->blocksMapOffset + (long) sizeof(superBlock->blocksCount);
-    superBlock->inodesTableOffset = superBlock->inodesMapOffset + (long) sizeof(superBlock->inodesCount);
-    superBlock->dataBlocksOffset = superBlock->inodesTableOffset + (long) sizeof(struct inode);
+    superBlock->inodesMapOffset = superBlock->blocksMapOffset + (long) superBlock->blocksCount;
+    superBlock->inodesTableOffset = superBlock->inodesMapOffset + (long) superBlock->inodesCount;
+    superBlock->dataBlocksOffset = superBlock->inodesTableOffset + (long)(sizeof(struct inode) * superBlock->inodesCount);
     superBlock->currentInode = ROOT_INODE;
     superBlock->rootInode = ROOT_INODE;
     superBlock->blocksPerInode = BLOCKS_PER_INODE;
@@ -62,6 +65,13 @@ struct super_block* getSuperBlock() {
     struct super_block* superBlock = (struct super_block*)malloc(sizeof(struct super_block));
     readFromFile(superBlock, sizeof(struct super_block), 1, 0);
     return superBlock;
+}
+
+void changeCurrentInode(size_t id) {
+    struct super_block* superBlock = getSuperBlock();
+    superBlock->currentInode = id;
+    updateSuperBlock(superBlock);
+    free(superBlock);
 }
 
 // --------------------------------- DATA BLOCKS LOGIC ----------------------------
@@ -106,12 +116,14 @@ size_t* getFreeBlocks(size_t count) {
         if (!blocksMap[i]) {
             freeBlocks[pointer++] = i;
             superBlock->freeBlocksCount--;
+            blocksMap[i] = true;
         }
         if (pointer == count) {
             break;
         }
     }
     updateSuperBlock(superBlock);
+    updateBlocksMap(blocksMap);
     free(superBlock);
     free(blocksMap);
     return freeBlocks;
@@ -228,6 +240,17 @@ size_t createInode(size_t parentId, bool isDir, char* fileName) {
     free(inodesMap);
     free(superBlock);
     return idx;
+}
+
+size_t createDirInode(size_t parentId, char* dirName) {
+    size_t newInode = createInode(parentId, true, dirName);
+    struct dir_data rootData[2];
+    strcpy(rootData[0].fileName, ".");
+    rootData[0].inodeId = newInode;
+    strcpy(rootData[1].fileName, "..");
+    rootData[1].inodeId = parentId;
+    writeToInode(newInode, sizeof(struct dir_data) * 2, (void*)rootData);
+    return newInode;
 }
 
 void updateInode(struct inode* node) {
@@ -352,5 +375,10 @@ struct inode* getCurrentDirInode() {
     free(superBlock);
     return node;
 }
+
+size_t getCountOfFiles(struct inode* node) {
+    return (size_t)(node->fileSize / sizeof(struct dir_data));
+}
+
 
 #endif //LINUX_FS_BASE_H

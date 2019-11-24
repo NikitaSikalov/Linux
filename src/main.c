@@ -6,9 +6,7 @@
 #include "operations.h"
 
 int main() {
-    struct inode* node = getCurrentDirInode();
     printStartString();
-    free(node);
     size_t maxLengthCommand = 100;
     char* cmd = NULL;
     while (true) {
@@ -23,6 +21,14 @@ int main() {
         } else if (strcmp(cmd, "mkdir") == 0) {
             cmd = strtok(NULL, " \n\t");
             mkdir(cmd);
+        } else if (strcmp(cmd, "touch") == 0) {
+            cmd = strtok(NULL, " \n\t");
+            touch(cmd);
+        } else if (strcmp(cmd, "cd") == 0) {
+            cmd = strtok(NULL, " \n\t");
+            struct super_block* superBlock = getSuperBlock();
+            cd(cmd, superBlock->currentInode);
+            free(superBlock);
         } else if (strcmp(cmd, "exit") == 0) {
             return 0;
         }

@@ -39,7 +39,7 @@ struct super_block {
 
 struct block_info {
     size_t id;          // индекс i-node
-    bool isEmpty;    // реальный размер
+    bool isEmpty;    // флаг занятости блока
     bool isDirect;     // прямая адресация или косвенная
 };
 
