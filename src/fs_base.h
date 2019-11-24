@@ -14,13 +14,19 @@ void initBlocksMap();
 void updateBlocksMap(bool* blocksMap);
 bool* getBlocksMap();
 size_t* getFreeBlocks(size_t count);
+void writeToBlock(size_t id, void* data);
+void readFromBlock(size_t id, void *data);
+void makeFreeBlocks(const size_t* blocks, size_t count);
 
 void initNodesMap();
 void updateInodesMap(bool*);
 bool* getInodesMap();
 struct inode* createInodeByIdx(size_t id, size_t parentId, bool isDir, char* fileName);
-void createInode(size_t parentId, bool isDir, char* fileName);
-void updateInode(struct inode* node, size_t id);
+size_t createInode(size_t parentId, bool isDir, char* fileName);
+void updateInode(struct inode* node);
+struct inode* getInodeById(size_t id);
+void writeToInode(size_t id, size_t size, void* data);
+void* readFromInode(size_t id);
 
 // ----------------------------- SUPER BLOCK LOGIC ----------------------------------------------
 
@@ -30,7 +36,7 @@ void initSuperBlock() {
     superBlock->freeBlocksCount = BLOCKS_COUNT;
     superBlock->inodesCount = INODES_COUNT;
     superBlock->inodesFreeCount = INODES_COUNT;
-    superBlock->sizeBlock = BLOCK_SIZE;
+    superBlock->blockSize = BLOCK_SIZE;
 
     superBlock->superBlockOffset = 0;
     superBlock->blocksMapOffset = superBlock->superBlockOffset + (long) sizeof(struct super_block);
@@ -41,6 +47,7 @@ void initSuperBlock() {
     superBlock->rootInode = ROOT_INODE;
     superBlock->blocksPerInode = BLOCKS_PER_INODE;
     superBlock->maxFileName = MAX_FILE_NAME;
+    superBlock->maxFileSize = (BLOCKS_PER_INODE - DIRECT_COUNT_BLOCKS) * BLOCKS_PER_INODE * BLOCK_SIZE;
     superBlock->blocksCountWithDirectAddress = DIRECT_COUNT_BLOCKS;
     updateSuperBlock(superBlock);
     free(superBlock);
@@ -57,7 +64,7 @@ struct super_block* getSuperBlock() {
 }
 
 // --------------------------------- DATA BLOCKS LOGIC ----------------------------
-void initBLocksMap() {
+void initBlocksMap() {
     struct super_block* superBlock = getSuperBlock();
     size_t blocksCount = superBlock->blocksCount;
     bool* blocksMap = (bool *)malloc(blocksCount);
@@ -107,6 +114,34 @@ size_t* getFreeBlocks(size_t count) {
     free(superBlock);
     free(blocksMap);
     return freeBlocks;
+}
+
+void writeToBlock(size_t id, void* data) {
+    struct super_block* superBlock = getSuperBlock();
+    long int offset = superBlock->dataBlocksOffset + (long)(id * superBlock->blockSize);
+    writeToFile(data, superBlock->blockSize, 1, offset);
+    free(superBlock);
+}
+
+void readFromBlock(size_t id, void* data) {
+    struct super_block* superBlock = getSuperBlock();
+    long int offset = superBlock->dataBlocksOffset + (long)(id * superBlock->blockSize);
+    readFromFile(data, superBlock->blockSize, 1, offset);
+    free(superBlock);
+}
+
+void makeFreeBlocks(const size_t* blocks, size_t count) {
+    bool* blocksMap = getBlocksMap();
+    struct super_block* superBlock = getSuperBlock();
+    for(size_t i = 0; i < count; ++i) {
+        blocksMap[blocks[i]] = false;
+        superBlock->freeBlocksCount++;
+    }
+
+    updateSuperBlock(superBlock);
+    updateBlocksMap(blocksMap);
+    free(blocksMap);
+    free(superBlock);
 }
 
 // ------------------------------------- INODES LOGIC ---------------------------------
@@ -166,15 +201,15 @@ struct inode* createInodeByIdx(size_t id, size_t parentId, bool isDir, char* fil
     for (size_t i = 0; i < superBlock->blocksPerInode; i++) {
         node->blocksInfo[i].id = freeBlocks[i];
         node->blocksInfo[i].isDirect = i < superBlock->blocksCountWithDirectAddress;
-        node->blocksInfo[i].realSize = 0;
+        node->blocksInfo[i].isEmpty = true;
     }
-    updateInode(node, id);
+    updateInode(node);
     free(superBlock);
     free(inodesMap);
     return node;
 }
 
-void createInode(size_t parentId, bool isDir, char* fileName) {
+size_t createInode(size_t parentId, bool isDir, char* fileName) {
     struct super_block* superBlock = getSuperBlock();
     if (superBlock->inodesFreeCount <= 0) {
         printf("Больше создать файл невозможно, так как все i-nodes заняты");
@@ -188,15 +223,127 @@ void createInode(size_t parentId, bool isDir, char* fileName) {
         exit(1);
     }
     node = createInodeByIdx(idx, parentId, isDir, fileName);
+    free(node);
     free(inodesMap);
+    free(superBlock);
+    return idx;
+}
+
+void updateInode(struct inode* node) {
+    struct super_block* superBlock = getSuperBlock();
+    long int offset = superBlock->inodesTableOffset + (long)(node->id * sizeof(struct inode));
+    writeToFile(node, sizeof(struct inode), 1, offset);
     free(superBlock);
 }
 
-void updateInode(struct inode* node, size_t id) {
+struct inode* getInodeById(size_t id) {
     struct super_block* superBlock = getSuperBlock();
     long int offset = superBlock->inodesTableOffset + (long)(id * sizeof(struct inode));
-    writeToFile(node, sizeof(struct inode), 1, offset);
+    struct inode* node = (struct inode*)malloc(sizeof(struct inode));
+    readFromFile(node, sizeof(struct inode), 1, offset);
     free(superBlock);
+    return node;
+}
+
+void writeToInode(size_t id, size_t size, void* data) {
+    struct inode* node = getInodeById(id);
+    struct super_block* superBlock = getSuperBlock();
+    if (size > superBlock->maxFileSize) {
+        printf("Превышен максимально допустимый размер файла, %d", (int)superBlock->maxFileSize);
+        return;
+    }
+    size_t blockSize = superBlock->blockSize;
+    size_t writePointer = 0;
+    node->fileSize = size;
+    for (size_t i = 0; i < superBlock->blocksPerInode && writePointer < size; ++i) {
+        struct block_info* block = &(node->blocksInfo[i]);
+        // дальше происходит следующее: достаем очередной блок из узла и смотрим
+        // если блок использует прямую адресацию, то сразу в него записываем данные и сдвигаем пишущий указатель дальше
+        // если блок использует косвенную адресацию, то сначала получаем эти блоки косвенной адресации, а потом
+        if (block->isDirect) {
+            // блок использует прямую адресацию, сразу в него записываем информацию
+            size_t sizeToWrite = (size - writePointer) > superBlock->blockSize
+                                 ? superBlock->blockSize
+                                 : size - writePointer;
+            void* tempData = malloc(sizeToWrite);
+            memcpy(tempData, data + writePointer, sizeToWrite);
+            writeToBlock(block->id, tempData);
+            writePointer += sizeToWrite;
+            block->isEmpty = false;
+            free(tempData);
+        } else {
+            size_t addBlocksCount = superBlock->blocksPerInode;
+            size_t* additionalBlocks;
+            // проверям, выделины ли вообще дополнительные блоки косвенной адресации
+            if (!block->isEmpty) {
+                additionalBlocks = (size_t*)malloc(addBlocksCount * sizeof(size_t));
+                readFromBlock(block->id, additionalBlocks);
+            } else {
+                // если не выделины, выделяем кол-во доп косвенных блоков в таком же кол-ве,
+                // как кол-во блоков на i-node
+                additionalBlocks = getFreeBlocks(superBlock->blocksPerInode);
+                block->isEmpty = false;
+                writeToBlock(block->id, additionalBlocks);
+            }
+            // далее записываем в косвенные блоки информацию
+            size_t j = 0;
+            while (size - writePointer != 0 && j < addBlocksCount) {
+                size_t sizeToWrite = (size - writePointer) > superBlock->blockSize
+                        ? superBlock->blockSize
+                        : size - writePointer;
+
+                void* tempData = malloc(sizeToWrite);
+                memcpy(tempData, data + writePointer, sizeToWrite);
+                writeToBlock(additionalBlocks[j], tempData);
+                writePointer += sizeToWrite;
+                j++;
+                free(tempData);
+            }
+            free(additionalBlocks);
+        }
+    }
+
+    updateInode(node);
+    free(node);
+    free(superBlock);
+}
+
+void* readFromInode(size_t id) {
+    struct super_block* superBlock = getSuperBlock();
+    struct inode* node = getInodeById(id);
+    size_t readerPointer = 0;
+    size_t size = node->fileSize;
+    void* data = malloc(size);
+    for (size_t i = 0; i < superBlock->blocksPerInode && readerPointer < size; ++i) {
+        struct block_info* block = &(node->blocksInfo[i]);
+        if (block->isDirect) {
+            size_t sizeToRead = (size - readerPointer) > superBlock->blockSize
+                                 ? superBlock->blockSize
+                                 : size - readerPointer;
+            void* tempData = malloc(sizeToRead);
+            readFromBlock(block->id, tempData);
+            memcpy(data + readerPointer, tempData, sizeToRead);
+            readerPointer += sizeToRead;
+            free(tempData);
+        } else {
+            size_t addBlocksCount = superBlock->blocksPerInode;
+            size_t* additionalBlocks = (size_t*)malloc(sizeof(size_t) * addBlocksCount);
+            for (size_t j = 0; j < addBlocksCount && readerPointer < size; ++j) {
+                size_t sizeToRead = (size - readerPointer) > superBlock->blockSize
+                                    ? superBlock->blockSize
+                                    : size - readerPointer;
+                void* tempData = malloc(sizeToRead);
+                readFromBlock(additionalBlocks[j], tempData);
+                memcpy(data + readerPointer, tempData, sizeToRead);
+                readerPointer += sizeToRead;
+                free(tempData);
+            }
+            free(additionalBlocks);
+        }
+    }
+    free(superBlock);
+    free(node);
+    return data;
 }
 
 #endif //LINUX_FS_BASE_H

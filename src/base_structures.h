@@ -18,7 +18,7 @@ struct super_block {
     // Блоки
     size_t blocksCount;
     size_t freeBlocksCount;
-    size_t sizeBlock;
+    size_t blockSize;
     // i-nodes
     size_t inodesCount;
     size_t inodesFreeCount;
@@ -33,12 +33,13 @@ struct super_block {
     size_t rootInode;       // указывает на корневой каталог
     size_t blocksPerInode;  // кол-во блоков на один i-узел
     size_t maxFileName;     // максимальное имя файла
+    size_t maxFileSize;     // максимальный размер файла
     size_t blocksCountWithDirectAddress;       // кол-во блоков в i-node с прямой адресацией
 };
 
 struct block_info {
     size_t id;          // индекс i-node
-    size_t realSize;    // реальный размер
+    bool isEmpty;    // реальный размер
     bool isDirect;     // прямая адресация или косвенная
 };
 
@@ -55,6 +56,11 @@ struct inode {
     char fileName[MAX_FILE_NAME];
 
     struct block_info blocksInfo[BLOCKS_PER_INODE];      // индексы блоков, который использует данный i-узел
+};
+
+struct dir_data {
+    size_t inodeId;
+    char fileName[MAX_FILE_NAME];
 };
 
 
