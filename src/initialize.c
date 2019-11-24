@@ -26,6 +26,6 @@ int main() {
     writeToInode(node->id, sizeRootData, (void*)rootData);
     free(node);
     free(superBlock);
-    printf("Инициализация файловой системы прошла успешно!");
+    printf("Инициализация файловой системы прошла успешно!\n");
     return 0;
 }

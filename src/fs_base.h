@@ -27,6 +27,7 @@ void updateInode(struct inode* node);
 struct inode* getInodeById(size_t id);
 void writeToInode(size_t id, size_t size, void* data);
 void* readFromInode(size_t id);
+struct inode* getCurrentDirInode();
 
 // ----------------------------- SUPER BLOCK LOGIC ----------------------------------------------
 
@@ -69,7 +70,7 @@ void initBlocksMap() {
     size_t blocksCount = superBlock->blocksCount;
     bool* blocksMap = (bool *)malloc(blocksCount);
     for (size_t i = 0; i < blocksCount; ++i) {
-        blocksMap[i] = false; // значит что блоки свободен
+        blocksMap[i] = false; // значит что блок свободен
     }
     updateBlocksMap(blocksMap);
     free(blocksMap);
@@ -127,7 +128,7 @@ void readFromBlock(size_t id, void* data) {
     struct super_block* superBlock = getSuperBlock();
     long int offset = superBlock->dataBlocksOffset + (long)(id * superBlock->blockSize);
     readFromFile(data, superBlock->blockSize, 1, offset);
-    free(superBlock);
+    //free(superBlock);
 }
 
 void makeFreeBlocks(const size_t* blocks, size_t count) {
@@ -252,7 +253,6 @@ void writeToInode(size_t id, size_t size, void* data) {
         printf("Превышен максимально допустимый размер файла, %d", (int)superBlock->maxFileSize);
         return;
     }
-    size_t blockSize = superBlock->blockSize;
     size_t writePointer = 0;
     node->fileSize = size;
     for (size_t i = 0; i < superBlock->blocksPerInode && writePointer < size; ++i) {
@@ -344,6 +344,13 @@ void* readFromInode(size_t id) {
     free(superBlock);
     free(node);
     return data;
+}
+
+struct inode* getCurrentDirInode() {
+    struct super_block* superBlock = getSuperBlock();
+    struct inode* node = getInodeById(superBlock->currentInode);
+    free(superBlock);
+    return node;
 }
 
 #endif //LINUX_FS_BASE_H

@@ -12,7 +12,7 @@ fi
 
 make build
 if [ -e $MAIN ]; then
-  export FILE_STORE=$FILE_STORE_NAME
+  export FILE_STORE=$FILE_STORE
   './'$MAIN
 else
   echo "Error, no executable file $MAKE, check Makefile"

@@ -15,7 +15,7 @@ if [ ! -e $BIN_DIR ]; then
 fi
 touch $FILE_STORE
 if [ -e $INIT_PROG ]; then
-  export FILE_STORE=$FILE_STORE_NAME
+  export FILE_STORE=$FILE_STORE
   './'$INIT_PROG
 else
   echo "Error, no executable file $INIT_PROG, check Makefile"
