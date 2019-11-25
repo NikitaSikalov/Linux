@@ -8,6 +8,8 @@
 void ls();
 void printStartString();
 void mkdir(char*);
+void echo(char*, char*);
+void cat(char*);
 
 void printStartString();
 void addFileToCurrentDir(char* fileName, bool isDir);
@@ -85,6 +87,13 @@ void addFileToCurrentDir(char* fileName, bool isDir) {
     free(dirData);
 }
 
+size_t getMaxFileSize() {
+    struct super_block* superBlock = getSuperBlock();
+    size_t size =superBlock->maxFileSize;
+    free(superBlock);
+    return size;
+}
+
 //----------------------------- COMMANDS -------------------------------
 
 void ls() {
@@ -155,5 +164,56 @@ void cd(char* path, size_t startInode) {
     free(dirData);
 }
 
+void echo(char* fileName, char* info) {
+    if (fileName == NULL || *fileName == '\0') {
+        printf(ANSI_COLOR_YELLOW"Введите имя файла\n"ANSI_COLOR_RESET);
+        return;
+    }
+    struct inode* node = getCurrentDirInode();
+    struct dir_data* dirData = (struct dir_data*)readFromInode(node->id);
+    size_t countFiles = getCountOfFiles(node);
+    for (size_t i = 0; i < countFiles; ++i) {
+        if(strcmp(fileName, dirData[i].fileName) == 0) {
+            struct inode* foundNode = getInodeById(dirData[i].inodeId);
+            if (foundNode->isDir) {
+                printf(ANSI_COLOR_RED"echo нельзя применть к директории %s\n"ANSI_COLOR_RESET, fileName);
+                return;
+            }
+            writeToInode(foundNode->id, (strlen(info) + 1) * sizeof(char), info);
+            free(foundNode);
+            return;
+        }
+    }
+    printf(ANSI_COLOR_RED"Файл %s не найден\n"ANSI_COLOR_RESET, fileName);
+    free(node);
+    free(dirData);
+}
+
+void cat(char* fileName) {
+    if (fileName == NULL || *fileName == '\0') {
+        printf(ANSI_COLOR_YELLOW"Введите имя файла\n"ANSI_COLOR_RESET);
+        return;
+    }
+    struct inode* node = getCurrentDirInode();
+    struct dir_data* dirData = (struct dir_data*)readFromInode(node->id);
+    size_t countFiles = getCountOfFiles(node);
+    for (size_t i = 0; i < countFiles; ++i) {
+        if(strcmp(fileName, dirData[i].fileName) == 0) {
+            struct inode* foundNode = getInodeById(dirData[i].inodeId);
+            if (foundNode->isDir) {
+                printf(ANSI_COLOR_RED"echo нельзя применть к директории %s\n"ANSI_COLOR_RESET, fileName);
+                return;
+            }
+            char* info = readFromInode(foundNode->id);
+            free(foundNode);
+            printf("%s\n", info);
+            free(info);
+            return;
+        }
+    }
+    printf(ANSI_COLOR_RED"Файл %s не найден\n"ANSI_COLOR_RESET, fileName);
+    free(node);
+    free(dirData);
+}
 
 #endif //FILE_SYSTEM_OPERATIONS_H
