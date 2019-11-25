@@ -9,7 +9,7 @@
 void updateSuperBlock(struct super_block* superBlock);
 void initSuperBlock();
 struct super_block* getSuperBlock();
-void changeCurrentInode(size_t id);
+bool changeCurrentInode(size_t id);
 
 void initBlocksMap();
 void updateBlocksMap(bool* blocksMap);
@@ -67,11 +67,18 @@ struct super_block* getSuperBlock() {
     return superBlock;
 }
 
-void changeCurrentInode(size_t id) {
+bool changeCurrentInode(size_t id) {
     struct super_block* superBlock = getSuperBlock();
+    struct inode* node = getInodeById(id);
+    if (!node->isDir) {
+        printf(ANSI_COLOR_RED"%s является файлом, а не директорией\n"ANSI_COLOR_RESET, node->fileName);
+        return false;
+    }
     superBlock->currentInode = id;
     updateSuperBlock(superBlock);
     free(superBlock);
+    free(node);
+    return true;
 }
 
 // --------------------------------- DATA BLOCKS LOGIC ----------------------------
@@ -104,7 +111,7 @@ bool* getBlocksMap() {
 size_t* getFreeBlocks(size_t count) {
     struct super_block* superBlock = getSuperBlock();
     if (superBlock->freeBlocksCount < count) {
-        printf("Невозможно выделить %d кол-во блоков, так как сейчас свободно %d",
+        printf(ANSI_COLOR_RED"Невозможно выделить %d кол-во блоков, так как сейчас свободно %d\n"ANSI_COLOR_RESET,
                 (int)count,
                 (int)superBlock->freeBlocksCount);
         return NULL;
@@ -189,11 +196,11 @@ struct inode* createInodeByIdx(size_t id, size_t parentId, bool isDir, char* fil
     struct super_block* superBlock = getSuperBlock();
     bool* inodesMap = getInodesMap();
     if (id >= superBlock->inodesCount) {
-        printf("Невозможно создать i-node с таким id=%d", (int)id);
+        printf(ANSI_COLOR_RED"Невозможно создать i-node с таким id=%d\n"ANSI_COLOR_RESET, (int)id);
         return NULL;
     }
     if (inodesMap[id]) {
-        printf("Блок с такм id=%d уже занят", (int)id);
+        printf(ANSI_COLOR_RED"Блок с такм id=%d уже занят\n"ANSI_COLOR_RESET, (int)id);
         return NULL;
     }
     inodesMap[id] = true;
@@ -225,7 +232,7 @@ struct inode* createInodeByIdx(size_t id, size_t parentId, bool isDir, char* fil
 size_t createInode(size_t parentId, bool isDir, char* fileName) {
     struct super_block* superBlock = getSuperBlock();
     if (superBlock->inodesFreeCount <= 0) {
-        printf("Больше создать файл невозможно, так как все i-nodes заняты");
+        printf(ANSI_COLOR_RED"Больше создать файл невозможно, так как все i-nodes заняты\n"ANSI_COLOR_RESET);
     }
     struct inode* node;
     bool* inodesMap = getInodesMap();
@@ -273,7 +280,7 @@ void writeToInode(size_t id, size_t size, void* data) {
     struct inode* node = getInodeById(id);
     struct super_block* superBlock = getSuperBlock();
     if (size > superBlock->maxFileSize) {
-        printf("Превышен максимально допустимый размер файла, %d", (int)superBlock->maxFileSize);
+        printf(ANSI_COLOR_RED"Превышен максимально допустимый размер файла, %d\n"ANSI_COLOR_RESET, (int)superBlock->maxFileSize);
         return;
     }
     size_t writePointer = 0;
@@ -365,7 +372,7 @@ void* readFromInode(size_t id) {
         }
     }
     free(superBlock);
-    free(node);
+    //free(node);
     return data;
 }
 

@@ -6,6 +6,9 @@
 #include "operations.h"
 
 int main() {
+    struct super_block* superBlock1 = getSuperBlock();
+    changeCurrentInode(superBlock1->rootInode);
+    free(superBlock1);
     printStartString();
     size_t maxLengthCommand = 100;
     char* cmd = NULL;
