@@ -31,6 +31,7 @@ void writeToInode(size_t id, size_t size, void* data);
 void* readFromInode(size_t id);
 struct inode* getCurrentDirInode();
 size_t getCountOfFiles(struct inode* node);
+void makeFreeInode(struct inode* node);
 
 // ----------------------------- SUPER BLOCK LOGIC ----------------------------------------------
 
@@ -154,10 +155,12 @@ void makeFreeBlocks(const size_t* blocks, size_t count) {
     bool* blocksMap = getBlocksMap();
     struct super_block* superBlock = getSuperBlock();
     for(size_t i = 0; i < count; ++i) {
-        blocksMap[blocks[i]] = false;
-        superBlock->freeBlocksCount++;
+        // проверяем, что блок действительно занят
+        if (blocksMap[blocks[i]]) {
+            blocksMap[blocks[i]] = false;
+            superBlock->freeBlocksCount++;
+        }
     }
-
     updateSuperBlock(superBlock);
     updateBlocksMap(blocksMap);
     free(blocksMap);
@@ -387,5 +390,36 @@ size_t getCountOfFiles(struct inode* node) {
     return (size_t)(node->fileSize / sizeof(struct dir_data));
 }
 
+void makeFreeInode(struct inode* node) {
+    bool* mapInodes = getInodesMap();
+    // если узел свободен, то дальше ничего не делаем
+    if (!mapInodes[node->id]) {
+        return;
+    }
+    struct super_block* superBlock = getSuperBlock();
+    size_t blocksCount = superBlock->blocksPerInode;
+    size_t* blocksToFree = (size_t* )malloc(sizeof(size_t) * blocksCount);
+    size_t pointer = 0;
+    for (size_t i = 0; i < blocksCount; ++i) {
+        // если используется косвенная адресация, то нужно почистить еще косвенный блоки
+        if (!node->blocksInfo[i].isDirect && !node->blocksInfo[i].isEmpty) {
+            size_t* blocks = (size_t*)malloc(sizeof(size_t) * blocksCount);
+            readFromBlock(node->blocksInfo[i].id, blocks);
+            makeFreeBlocks(blocks, blocksCount);
+            free(blocks);
+        }
+        blocksToFree[pointer++] = node->blocksInfo[i].id;
+    }
+    // все блоки i-nodes точно заняты и их нужно почистить
+    makeFreeBlocks(blocksToFree, pointer);
+
+    superBlock->inodesFreeCount++;
+    mapInodes[node->id] = false;
+
+    updateInodesMap(mapInodes);
+    updateSuperBlock(superBlock);
+    free(blocksToFree);
+    free(superBlock);
+}
 
 #endif //LINUX_FS_BASE_H

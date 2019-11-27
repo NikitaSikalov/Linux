@@ -66,6 +66,14 @@ int main() {
                 continue;
             }
             cat(cmd);
+        } else if (strcmp(cmd, "rm") == 0) {
+            cmd = strtok(NULL, " \n\t");
+            if (cmd == NULL) {
+                printf(ANSI_COLOR_RED"Введите имя файла\n"ANSI_COLOR_RESET);
+                printStartString();
+                continue;
+            }
+            rm(cmd);
         } else if (strcmp(cmd, "exit") == 0) {
             return 0;
         }
