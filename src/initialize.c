@@ -4,6 +4,7 @@
 
 #include "fs_base.h"
 
+
 int main() {
     // инициализурем супер-блок и записываем его в файл
     initSuperBlock();
@@ -26,6 +27,7 @@ int main() {
     writeToInode(node->id, sizeRootData, (void*)rootData);
     free(node);
     free(superBlock);
-    printf("Инициализация файловой системы прошла успешно!\n");
+    printf(ANSI_COLOR_GREEN"Инициализация файловой системы прошла успешно ✓\n"ANSI_COLOR_RESET);
+    printf(ANSI_COLOR_YELLOW"Запустите файловую систему командой bash start.sh\n");
     return 0;
 }

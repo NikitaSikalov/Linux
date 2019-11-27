@@ -10,7 +10,7 @@ if [ ! -e $FILE_STORE ]; then
   exit 1
 fi
 
-make build
+make build > /dev/null
 if [ -e $MAIN ]; then
   export FILE_STORE=$FILE_STORE
   './'$MAIN

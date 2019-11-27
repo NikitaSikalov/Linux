@@ -5,7 +5,7 @@ FILE_STORE_NAME="fs_store"
 FILE_STORE="$BIN_DIR/$FILE_STORE_NAME"
 INIT_PROG="$BIN_DIR/initProg.o"
 
-make init
+make init > /dev/null
 if [ -e $FILE_STORE ]; then
   rm $FILE_STORE
 fi

@@ -6,6 +6,8 @@
 #include "operations.h"
 
 int main() {
+    help();
+
     struct super_block* superBlock1 = getSuperBlock();
     changeCurrentInode(superBlock1->rootInode);
     free(superBlock1);
@@ -74,6 +76,8 @@ int main() {
                 continue;
             }
             rm(cmd);
+        } else if (strcmp(cmd, "help") == 0) {
+            help();
         } else if (strcmp(cmd, "exit") == 0) {
             return 0;
         }
