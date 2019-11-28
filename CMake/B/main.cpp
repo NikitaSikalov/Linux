@@ -3,5 +3,6 @@
 
 int main() {
     printMessage();
+    printPythonLine();
     return 0;
 }
