@@ -28,3 +28,11 @@ add_custom_target(run ALL
 # создаем dependency на основой исполняемый файл
 add_dependencies(main run)
 
+find_package(Doxygen REQUIRED)
+
+add_custom_target(docs ALL
+        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile
+)
+
