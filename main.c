@@ -30,6 +30,7 @@ int main() {
         syslog(LOG_DEBUG, "Подсоединился %d новый пользователь. Обрабатывает процесс %d", sock, getpid());
         while(1) {
             bytes_read = recv(sock, buf, 1024, 0);
+            syslog(LOG_DEBUG, "Процесс %d принял сообщение %s", getpid(), buf);
             if (bytes_read <= 0) break;
             send(sock, buf, bytes_read, 0);
         }
