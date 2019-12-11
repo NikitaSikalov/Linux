@@ -3,16 +3,12 @@
 BIN_DIR="bin"
 FILE_STORE_NAME="fs_store"
 FILE_STORE="$BIN_DIR/$FILE_STORE_NAME"
-INIT_PROG="$BIN_DIR/initProg.o"
+INIT_PROG="$BIN_DIR/init"
 
-make init > /dev/null
 if [ -e $FILE_STORE ]; then
   rm $FILE_STORE
 fi
 
-if [ ! -e $BIN_DIR ]; then
-  mkdir $BIN_DIR
-fi
 touch $FILE_STORE
 if [ -e $INIT_PROG ]; then
   export FILE_STORE=$FILE_STORE
