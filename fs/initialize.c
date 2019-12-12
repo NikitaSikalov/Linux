@@ -27,6 +27,5 @@ int main() {
     free(node);
     free(superBlock);
     printf(ANSI_COLOR_GREEN"Инициализация файловой системы прошла успешно ✓\n"ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"Запустите файловую систему командой bash start.sh\n");
     return 0;
 }

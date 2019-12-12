@@ -329,8 +329,6 @@ void help(char buf[]) {
     strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
     strcat(buf, ANSI_COLOR_YELLOW"exit"ANSI_COLOR_RESET);
     strcat(buf, " —— выходит из программы\n");
-
-    syslog(LOG_DEBUG, "Длина %lu help сообщения", strlen(buf)  + 1);
 }
 
 #endif //FILE_SYSTEM_OPERATIONS_H

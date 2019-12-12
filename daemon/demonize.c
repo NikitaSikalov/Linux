@@ -39,6 +39,6 @@ int demonize() {
     umask(0);
     chdir("/");
     openlog("mydaemon", LOG_PID, LOG_DAEMON);
-    syslog(LOG_DEBUG, "Запущен демон: %d", getpid());
+    syslog(LOG_DEBUG, "Запущен демон, pid = %d", getpid());
     return 0;
 }

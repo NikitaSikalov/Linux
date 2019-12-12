@@ -1,0 +1,5 @@
+.idea
+materials/
+**/bin/
+**/build/
+cmake-build-debug/

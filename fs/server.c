@@ -113,7 +113,7 @@ int main() {
         if (pid > 0) {
             continue;
         }
-        syslog(LOG_DEBUG, "Подсоединился %d новый пользователь. Обрабатывает процесс %d", sock, getpid());
+        syslog(LOG_DEBUG, "Подсоединился новый пользователь, sock = %d. Обрабатывает процесс pid = %d", sock, getpid());
 
         help(buf);
         send(sock, buf, MAX_BUF_SIZE, 0);
@@ -123,7 +123,6 @@ int main() {
 
             bytes_read = recv(sock, buf, MAX_BUF_SIZE, 0);
             if (bytes_read <= 0) break;
-            syslog(LOG_DEBUG, "Процесс %d принял сообщение %s", getpid(), buf);
 
             char command[MAX_BUF_SIZE];
             strcpy(command, buf);
@@ -131,6 +130,7 @@ int main() {
             processCommand(command, buf);
             send(sock, buf, MAX_BUF_SIZE, 0);
         }
+        syslog(LOG_DEBUG, "Сессия с sock = %d окончена. Процесс с pid = %d завершился", sock, getpid());
         close(sock);
         return 0;
     }
