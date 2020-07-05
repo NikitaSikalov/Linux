@@ -6,6 +6,8 @@
 #define BLOCKS_PER_INODE 16     // кол-во блоков на один inode
 #define BLOCKS_COUNT 2048 // BLOCKS_PER_INODE * INODES_COUNT
 
+#define MAX_BUF_SIZE 2048
+
 #define DIRECT_COUNT_BLOCKS 12  // кол-во адресных ячеек использующих прямую адресацию
 
 #define ROOT_INODE 0    // корневой i-node для пути /

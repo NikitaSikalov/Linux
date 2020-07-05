@@ -5,19 +5,20 @@
 #ifndef FILE_SYSTEM_OPERATIONS_H
 #define FILE_SYSTEM_OPERATIONS_H
 
-void ls();
-void mkdir(char*);
-void echo(char*, char*);
-void cd(char* path, size_t startInode);
-void cat(char*);
-void rm(char*);
-void help();
+void ls(char buf[]);
+void mkdir(char*, char buf[]);
+void echo(char*, char*, char buf[]);
+void cd(char* path, size_t startInode, char buf[]);
+void touch(char* fileName, char buf[]);
+void cat(char*, char buf[]);
+void rm(char*, char buf[]);
+void help(char buf[]);
 
-void printStartString();
-void addFileToCurrentDir(char* fileName, bool isDir);
+void printStartString(char answer[]);
+void addFileToCurrentDir(char* fileName, bool isDir, char buf[]);
 char* getCurrentPath();
+size_t getMaxFileSize();
 struct inode* getInodeByFileName(char* fileName);
-void help();
 
 //------------------------------------ UTILS -----------------------------------
 char* getCurrentPath() {
@@ -43,28 +44,28 @@ char* getCurrentPath() {
     return currentPath;
 }
 
-void printStartString() {
+void printStartString(char answer[]) {
     struct inode* node = getCurrentDirInode();
     char* currentPath = getCurrentPath();
-    printf(ANSI_COLOR_GREEN"myFS"ANSI_COLOR_RESET);
-    printf(":");
-    printf(ANSI_COLOR_BLUE"%s"ANSI_COLOR_RESET, currentPath);
-    printf("$ ");
+    strcpy(answer, ANSI_COLOR_GREEN"myFS"ANSI_COLOR_RESET);
+    strcat(answer, ":"ANSI_COLOR_BLUE);
+    strcat(answer, currentPath);
+    strcat(answer, ANSI_COLOR_RESET"$ ");
     free(node);
     //free(currentPath);
 }
 
-void addFileToCurrentDir(char* fileName, bool isDir) {
+void addFileToCurrentDir(char* fileName, bool isDir, char buf[]) {
     struct super_block* superBlock = getSuperBlock();
     if (fileName == NULL) {
-        printf(ANSI_COLOR_YELLOW"Пожалуйста введите имя файла\n"ANSI_COLOR_RESET);
+        strcpy(buf, ANSI_COLOR_YELLOW"Пожалуйста введите имя файла\n"ANSI_COLOR_RESET);
         return;
     }
     if (strcmp(fileName, ".") == 0 || strcmp(fileName, "..") == 0) {
-        printf(ANSI_COLOR_RED"Недопустимое имя файла\n"ANSI_COLOR_RESET);
+        strcpy(buf, ANSI_COLOR_RED"Недопустимое имя файла\n"ANSI_COLOR_RESET);
     }
     if (strlen(fileName) > superBlock->maxFileName) {
-        printf(ANSI_COLOR_RED"Первышена допустимая длина файла, %lu\n"ANSI_COLOR_RESET, superBlock->maxFileName);
+        strcpy(buf, ANSI_COLOR_RED"Первышена допустимая длина файла\n"ANSI_COLOR_RESET);
         return;
     }
     struct inode* node = getCurrentDirInode();
@@ -72,7 +73,7 @@ void addFileToCurrentDir(char* fileName, bool isDir) {
     size_t countFiles = getCountOfFiles(node);
     for (size_t i = 0; i < countFiles; ++i) {
         if (strcmp(dirData[i].fileName, fileName) == 0) {
-            printf(ANSI_COLOR_RED"Файл с таким именем уже существует в данной директории\n"ANSI_COLOR_RED);
+            strcpy(buf, ANSI_COLOR_RED"Файл с таким именем уже существует в данной директории\n"ANSI_COLOR_RED);
             return;
         }
     }
@@ -120,35 +121,39 @@ struct inode* getInodeByFileName(char* fileName) {
 
 //----------------------------- COMMANDS -------------------------------
 
-void ls() {
+void ls(char buf[]) {
     struct inode* node = getCurrentDirInode();
     struct dir_data* dirData = (struct dir_data*)readFromInode(node->id);
     size_t countFiles = getCountOfFiles(node);
+    strcpy(buf, "\0");
     for (size_t i = 0; i < countFiles; ++i) {
         struct inode* nodeOfFile = getInodeById(dirData[i].inodeId);
         if (nodeOfFile->isDir) {
-            printf(ANSI_COLOR_BLUE"%s\t"ANSI_COLOR_RESET, dirData[i].fileName);
+            strcat(buf, ANSI_COLOR_BLUE);
+            strcat(buf, dirData[i].fileName);
+            strcat(buf, "\t"ANSI_COLOR_RESET);
         } else {
-            printf("%s\t", dirData[i].fileName);
+            strcat(buf, dirData[i].fileName);
+            strcat(buf, "\t");
         }
         free(nodeOfFile);
     }
-    printf("\n");
+    strcat(buf, "\n");
     free(node);
     free(dirData);
 }
 
 
 
-void mkdir(char* dirName) {
-    addFileToCurrentDir(dirName, true);
+void mkdir(char* dirName, char buf[]) {
+    addFileToCurrentDir(dirName, true, buf);
 }
 
-void touch(char* fileName) {
-    addFileToCurrentDir(fileName, false);
+void touch(char* fileName, char buf[]) {
+    addFileToCurrentDir(fileName, false, buf);
 }
 
-void cd(char* path, size_t startInode) {
+void cd(char* path, size_t startInode, char buf[]) {
     if (*path == '/') {
         struct super_block* superBlock = getSuperBlock();
         changeCurrentInode(superBlock->rootInode);
@@ -173,7 +178,7 @@ void cd(char* path, size_t startInode) {
             }
             if (nextPath != NULL) {
                 char* newPath = nextPath + 1;
-                cd(newPath, startInode);
+                cd(newPath, startInode, buf);
             }
             free(nextDir);
             free(node);
@@ -182,15 +187,15 @@ void cd(char* path, size_t startInode) {
         }
     }
     changeCurrentInode(startInode);
-    printf(ANSI_COLOR_RED"Невозможно перейти по такому пути\n"ANSI_COLOR_RESET);
+    strcpy(buf, ANSI_COLOR_RED"Невозможно перейти по такому пути\n"ANSI_COLOR_RESET);
     free(nextDir);
     free(node);
     free(dirData);
 }
 
-void echo(char* fileName, char* info) {
+void echo(char* fileName, char* info, char buf[]) {
     if (fileName == NULL || *fileName == '\0') {
-        printf(ANSI_COLOR_YELLOW"Введите имя файла\n"ANSI_COLOR_RESET);
+        strcpy(buf, ANSI_COLOR_YELLOW"Введите имя файла\n"ANSI_COLOR_RESET);
         return;
     }
     struct inode* node = getCurrentDirInode();
@@ -200,7 +205,7 @@ void echo(char* fileName, char* info) {
         if(strcmp(fileName, dirData[i].fileName) == 0) {
             struct inode* foundNode = getInodeById(dirData[i].inodeId);
             if (foundNode->isDir) {
-                printf(ANSI_COLOR_RED"echo нельзя применть к директории %s\n"ANSI_COLOR_RESET, fileName);
+                strcpy(buf, ANSI_COLOR_RED"echo нельзя применть к директории\n"ANSI_COLOR_RESET);
                 return;
             }
             writeToInode(foundNode->id, (strlen(info) + 1) * sizeof(char), info);
@@ -208,14 +213,14 @@ void echo(char* fileName, char* info) {
             return;
         }
     }
-    printf(ANSI_COLOR_RED"Файл %s не найден\n"ANSI_COLOR_RESET, fileName);
+    strcpy(buf, ANSI_COLOR_RED"Файл не найден\n"ANSI_COLOR_RESET);
     free(node);
     free(dirData);
 }
 
-void cat(char* fileName) {
+void cat(char* fileName, char buf[]) {
     if (fileName == NULL || *fileName == '\0') {
-        printf(ANSI_COLOR_YELLOW"Введите имя файла\n"ANSI_COLOR_RESET);
+        strcpy(buf, ANSI_COLOR_YELLOW"Введите имя файла\n"ANSI_COLOR_RESET);
         return;
     }
     struct inode* node = getCurrentDirInode();
@@ -225,44 +230,45 @@ void cat(char* fileName) {
         if(strcmp(fileName, dirData[i].fileName) == 0) {
             struct inode* foundNode = getInodeById(dirData[i].inodeId);
             if (foundNode->isDir) {
-                printf(ANSI_COLOR_RED"cat нельзя применть к директории %s\n"ANSI_COLOR_RESET, fileName);
+                strcpy(buf, ANSI_COLOR_RED"cat нельзя применть к директории\n"ANSI_COLOR_RESET);
                 return;
             }
             char* info = readFromInode(foundNode->id);
             free(foundNode);
-            printf("%s\n", info);
+            strcpy(buf, info);
+            strcat(buf, "\n");
             free(info);
             return;
         }
     }
-    printf(ANSI_COLOR_RED"Файл %s не найден\n"ANSI_COLOR_RESET, fileName);
+    strcpy(buf, ANSI_COLOR_RED"Файл не найден\n"ANSI_COLOR_RESET);
     free(node);
     free(dirData);
 }
 
-void rm(char* fileName) {
+void rm(char* fileName, char buf[]) {
     struct inode* node = getInodeByFileName(fileName);
     if (strcmp(fileName, ".") == 0 || strcmp(fileName, "..") == 0) {
         return;
     }
     if (node == NULL) {
-        printf(ANSI_COLOR_RED"Файл не найден\n"ANSI_COLOR_RESET);
+        strcpy(buf, ANSI_COLOR_RED"Файл не найден\n"ANSI_COLOR_RESET);
         return;
     }
     struct inode* currentNode = getCurrentDirInode();
     // Если удаляемый файл является директорий, то перед ее удалением необходимо почистить ее содержимое
     if (node->isDir) {
         // переходим сначала в удаляемую папку
-        cd(fileName, currentNode->id);
+        cd(fileName, currentNode->id, buf);
         // считываем какие в ней есть файлы
         struct dir_data* dirData = readFromInode(node->id);
         size_t countOfFiles = getCountOfFiles(node);
         // удаляем каждый файл
         for (size_t i = 0; i < countOfFiles; ++i) {
-            rm(dirData[i].fileName);
+            rm(dirData[i].fileName, buf);
         }
         // вовзвращаемся обратно и далее эту узел к этой директории можно спокойно удалять
-        cd("..", currentNode->id);
+        cd("..", currentNode->id, buf);
     }
 
     // подчищаем записи об этой файле в текущей директории
@@ -283,46 +289,46 @@ void rm(char* fileName) {
     free(currentNode);
 }
 
-void help() {
-    printf(ANSI_COLOR_MAGENTA"⍰ "ANSI_COLOR_RESET);
-    printf("Помощь по командам");
-    printf(ANSI_COLOR_MAGENTA" ⍰ \n"ANSI_COLOR_RESET);
+void help(char buf[]) {
+    strcpy(buf, ANSI_COLOR_MAGENTA"⍰ "ANSI_COLOR_RESET);
+    strcat(buf, "Помощь по командам");
+    strcat(buf, ANSI_COLOR_MAGENTA" ⍰ \n"ANSI_COLOR_RESET);
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"ls"ANSI_COLOR_RESET);
-    printf(" —— выводит список файлов в текущей директории\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"ls"ANSI_COLOR_RESET);
+    strcat(buf, " —— выводит список файлов в текущей директории\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"mkdir <name of dir>"ANSI_COLOR_RESET);
-    printf(" —— создает директорию в текущей директории\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"mkdir <name of dir>"ANSI_COLOR_RESET);
+    strcat(buf, " —— создает директорию в текущей директории\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"touch <name of file>"ANSI_COLOR_RESET);
-    printf(" —— создает файл в текущей директории\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"touch <name of file>"ANSI_COLOR_RESET);
+    strcat(buf, " —— создает файл в текущей директории\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"echo <string> > <file name>"ANSI_COLOR_RESET);
-    printf(" —— делает запись в файл\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"echo <string> > <file name>"ANSI_COLOR_RESET);
+    strcat(buf, " —— делает запись в файл\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"cat <file name>"ANSI_COLOR_RESET);
-    printf(" —— выводит строковые данные из файла\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"cat <file name>"ANSI_COLOR_RESET);
+    strcat(buf, " —— выводит строковые данные из файла\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"cd <path>"ANSI_COLOR_RESET);
-    printf(" —— переходит в выбранную директорию по заданному (можно задать путь абсолютно)\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"cd <path>"ANSI_COLOR_RESET);
+    strcat(buf, " —— переходит в выбранную директорию по заданному (можно задать путь абсолютно)\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"rm <file/dir name>"ANSI_COLOR_RESET);
-    printf(" —— удаляет файл в текущей директории. Если файл директория, то удаляет ее и рекурсвино все подфайлы в ней\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"rm <file/dir name>"ANSI_COLOR_RESET);
+    strcat(buf, " —— удаляет файл в текущей директории. Если файл директория, то удаляет ее и рекурсвино все подфайлы в ней\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"help"ANSI_COLOR_RESET);
-    printf(" —— выводит справку по командам\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"help"ANSI_COLOR_RESET);
+    strcat(buf, " —— выводит справку по командам\n");
 
-    printf(ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
-    printf(ANSI_COLOR_YELLOW"exit"ANSI_COLOR_RESET);
-    printf(" —— выходит из программы\n");
+    strcat(buf, ANSI_COLOR_BLUE"• "ANSI_COLOR_RESET);
+    strcat(buf, ANSI_COLOR_YELLOW"exit"ANSI_COLOR_RESET);
+    strcat(buf, " —— выходит из программы\n");
 }
 
 #endif //FILE_SYSTEM_OPERATIONS_H
